@@ -2,9 +2,14 @@ name: Linux AppImage
 
 on:
   push:
-    branches: ["**"]
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
+
+# Run at most one build per ref, cancelling any superseded in-progress run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
