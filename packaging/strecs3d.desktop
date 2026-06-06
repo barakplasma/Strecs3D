@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Strecs3D
+GenericName=3D Printing Infill Preprocessor
+Comment=Generate optimized variable-density infill from structural analysis
+Exec=Strecs3D
+Icon=strecs3d
+Terminal=false
+Categories=Graphics;Engineering;Science;
+Keywords=3D;Printing;Infill;FEM;STL;3MF;Slicer;

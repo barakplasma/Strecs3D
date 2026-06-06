@@ -1,0 +1,108 @@
+name: Linux AppImage
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-appimage:
+    name: Build Linux AppImage
+    # ubuntu-22.04 gives an older glibc for broad AppImage compatibility
+    runs-on: ubuntu-22.04
+
+    env:
+      VCPKG_TARGET_TRIPLET: x64-linux-dynamic
+      # Use GitHub Actions cache as a vcpkg binary cache so reruns are fast
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build autoconf automake autoconf-archive \
+            libtool pkg-config python3 bison flex gperf \
+            libgl1-mesa-dev libglu1-mesa-dev libegl1-mesa-dev mesa-common-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev '^libxcb.*-dev' \
+            libx11-dev libx11-xcb-dev libxext-dev libxrender-dev libxi-dev \
+            libxrandr-dev libxcursor-dev libxdamage-dev libxfixes-dev \
+            libxtst-dev libxss-dev libfontconfig1-dev libfreetype-dev \
+            libwayland-dev libdbus-1-dev libssl-dev \
+            libfuse2 file desktop-file-utils zsync
+
+      - name: Set up vcpkg environment
+        run: |
+          echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
+
+      - name: Export GitHub Actions cache env for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Configure (CMake + vcpkg)
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DVCPKG_TARGET_TRIPLET="$VCPKG_TARGET_TRIPLET" \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Assemble AppDir
+        run: |
+          set -eux
+          APPDIR="$PWD/AppDir"
+          rm -rf "$APPDIR"
+          install -Dm755 build/Strecs3D "$APPDIR/usr/bin/Strecs3D"
+          install -Dm644 packaging/strecs3d.desktop \
+            "$APPDIR/usr/share/applications/strecs3d.desktop"
+          install -Dm644 packaging/strecs3d.png \
+            "$APPDIR/usr/share/icons/hicolor/256x256/apps/strecs3d.png"
+
+      - name: Download linuxdeploy
+        run: |
+          set -eux
+          curl -fsSL -o linuxdeploy \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -fsSL -o linuxdeploy-plugin-qt \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy linuxdeploy-plugin-qt
+
+      - name: Build AppImage
+        run: |
+          set -eux
+          VCPKG_LIB="$PWD/vcpkg_installed/$VCPKG_TARGET_TRIPLET/lib"
+          # qmake from the vcpkg-built Qt so the qt plugin deploys the right Qt
+          QMAKE_BIN="$(find "$PWD/vcpkg_installed/$VCPKG_TARGET_TRIPLET" \
+            -name qmake -type f 2>/dev/null | head -n1)"
+          echo "Using qmake: ${QMAKE_BIN:-<none>}"
+          # Let ldd resolve the vcpkg shared libraries during bundling
+          export LD_LIBRARY_PATH="$VCPKG_LIB:${LD_LIBRARY_PATH:-}"
+          export QMAKE="$QMAKE_BIN"
+          export OUTPUT="Strecs3D-x86_64.AppImage"
+          ./linuxdeploy \
+            --appdir AppDir \
+            --executable build/Strecs3D \
+            --desktop-file packaging/strecs3d.desktop \
+            --icon-file packaging/strecs3d.png \
+            --library-path "$VCPKG_LIB" \
+            --plugin qt \
+            --output appimage
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Strecs3D-x86_64.AppImage
+          path: Strecs3D-x86_64.AppImage
+          if-no-files-found: error
