@@ -11,3 +11,8 @@ set(VCPKG_CMAKE_SYSTEM_NAME Linux)
 
 set(VCPKG_CXX_FLAGS "-fpermissive")
 set(VCPKG_C_FLAGS "")
+
+# Release-only: we ship a Release AppImage and never need vcpkg debug libraries.
+# This roughly halves both build time and disk usage (the full debug+release
+# build of Qt/VTK/OpenCASCADE otherwise exhausts the runner's disk).
+set(VCPKG_BUILD_TYPE release)

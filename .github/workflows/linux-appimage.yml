@@ -34,6 +34,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Free up disk space
+        run: |
+          # vcpkg builds a lot of large C++ deps; reclaim space from preinstalled
+          # toolchains we don't use so the linker doesn't run out of disk.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost \
+            /usr/local/share/powershell /usr/local/lib/node_modules || true
+          sudo docker image prune -af || true
+          df -h /
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
