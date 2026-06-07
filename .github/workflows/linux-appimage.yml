@@ -22,8 +22,11 @@ jobs:
 
     env:
       VCPKG_TARGET_TRIPLET: x64-linux-dynamic
-      # Use GitHub Actions cache as a vcpkg binary cache so reruns are fast
-      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      # vcpkg writes every package it builds here (the "files" binary cache).
+      # This directory is persisted across runs via actions/cache below, so a
+      # successful build is only ever paid for once. NOTE: the old "x-gha"
+      # backend was removed from vcpkg, hence the on-disk files cache instead.
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-bincache
 
     steps:
       - name: Checkout
@@ -46,13 +49,20 @@ jobs:
       - name: Set up vcpkg environment
         run: |
           echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
 
-      - name: Export GitHub Actions cache env for vcpkg
-        uses: actions/github-script@v7
+      # Restore previously-built vcpkg packages. The key changes only when the
+      # dependency set changes (vcpkg.json / custom ports), so ordinary source
+      # edits reuse the full cache. restore-keys lets a run pick up the most
+      # recent partial cache from an earlier (even failed) run.
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'ports/**') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'ports/**') }}-
+            vcpkg-${{ runner.os }}-
 
       - name: Configure (CMake + vcpkg)
         run: |
@@ -111,3 +121,14 @@ jobs:
           name: Strecs3D-x86_64.AppImage
           path: Strecs3D-x86_64.AppImage
           if-no-files-found: error
+
+      # Save the binary cache even if the build failed, so the packages that did
+      # compile (Qt, VTK, OpenCASCADE, ...) are not rebuilt next time. The
+      # run-id-suffixed key is always unique, so the save never collides; the
+      # restore step above finds it via the prefix in restore-keys.
+      - name: Save vcpkg binary cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'ports/**') }}-${{ github.run_id }}
