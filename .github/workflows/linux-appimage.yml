@@ -107,13 +107,18 @@ jobs:
           chmod +x linuxdeploy linuxdeploy-plugin-qt
 
       - name: Build AppImage
+        env:
+          # linuxdeploy and the tools it invokes are AppImages; hosted runners
+          # can't always FUSE-mount them, so extract-and-run instead.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
           set -eux
           VCPKG_LIB="$PWD/vcpkg_installed/$VCPKG_TARGET_TRIPLET/lib"
           # qmake from the vcpkg-built Qt so the qt plugin deploys the right Qt
           QMAKE_BIN="$(find "$PWD/vcpkg_installed/$VCPKG_TARGET_TRIPLET" \
-            -name qmake -type f 2>/dev/null | head -n1)"
+            \( -name qmake -o -name qmake6 \) -type f 2>/dev/null | head -n1)"
           echo "Using qmake: ${QMAKE_BIN:-<none>}"
+          test -n "$QMAKE_BIN" || { echo "ERROR: qmake not found"; exit 1; }
           # Let ldd resolve the vcpkg shared libraries during bundling
           export LD_LIBRARY_PATH="$VCPKG_LIB:${LD_LIBRARY_PATH:-}"
           export QMAKE="$QMAKE_BIN"
