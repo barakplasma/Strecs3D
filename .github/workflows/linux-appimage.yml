@@ -135,7 +135,6 @@ jobs:
             --executable build/Strecs3D \
             --desktop-file packaging/strecs3d.desktop \
             --icon-file packaging/strecs3d.png \
-            --library-path "$VCPKG_LIB" \
             --plugin qt \
             --output appimage
 
