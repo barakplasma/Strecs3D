@@ -22,6 +22,8 @@ jobs:
 
     env:
       VCPKG_TARGET_TRIPLET: x64-linux-dynamic
+      # Use our overlay triplet (adds -fpermissive for OpenCASCADE vs FreeType).
+      VCPKG_OVERLAY_TRIPLETS: ${{ github.workspace }}/vcpkg-triplets
       # vcpkg writes every package it builds here (the "files" binary cache).
       # This directory is persisted across runs via actions/cache below, so a
       # successful build is only ever paid for once. NOTE: the old "x-gha"
