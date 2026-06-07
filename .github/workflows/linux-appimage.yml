@@ -114,11 +114,18 @@ jobs:
         run: |
           set -eux
           VCPKG_LIB="$PWD/vcpkg_installed/$VCPKG_TARGET_TRIPLET/lib"
-          # qmake from the vcpkg-built Qt so the qt plugin deploys the right Qt
-          QMAKE_BIN="$(find "$PWD/vcpkg_installed/$VCPKG_TARGET_TRIPLET" \
-            \( -name qmake -o -name qmake6 \) -type f 2>/dev/null | head -n1)"
+          # qmake from the vcpkg-built Qt so the qt plugin deploys the right Qt.
+          # Search the whole vcpkg_installed tree (host tools may live under the
+          # host triplet dir) and allow symlinks.
+          QMAKE_BIN="$(find "$PWD/vcpkg_installed" \( -name qmake6 -o -name qmake \) \
+            \( -type f -o -type l \) 2>/dev/null | head -n1)"
           echo "Using qmake: ${QMAKE_BIN:-<none>}"
-          test -n "$QMAKE_BIN" || { echo "ERROR: qmake not found"; exit 1; }
+          if [ -z "$QMAKE_BIN" ]; then
+            echo "ERROR: qmake not found. Qt tool/bin layout was:"
+            find "$PWD/vcpkg_installed" -path '*Qt6/bin/*' -o -name 'qtpaths*' 2>/dev/null | head -n 50 || true
+            find "$PWD/vcpkg_installed" -type d -name bin 2>/dev/null | head -n 50 || true
+            exit 1
+          fi
           # Let ldd resolve the vcpkg shared libraries during bundling
           export LD_LIBRARY_PATH="$VCPKG_LIB:${LD_LIBRARY_PATH:-}"
           export QMAKE="$QMAKE_BIN"
