@@ -14,6 +14,7 @@ vcpkg_from_gitlab(
     PATCHES
         installdirs.diff
         linking-and-naming.diff
+        cxx17.diff
 )
 
 string(COMPARE EQUAL "${VCPKG_LIBRARY_LINKAGE}" "static" BUILD_LIB)

@@ -1,0 +1,9 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -16,4 +16,4 @@
+ # require C++14 and request C99
+-set(CMAKE_CXX_STANDARD 14)
++set(CMAKE_CXX_STANDARD 17)  # bumped: OpenCASCADE >= 7.9 headers require C++17
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_C_STANDARD 99)
